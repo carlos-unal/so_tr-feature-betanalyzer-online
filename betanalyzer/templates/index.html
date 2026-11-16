@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BetAnalyzer — análisis de apuestas deportivas</title>
+<style>
+  :root { --bg:#0f1420; --card:#1a2133; --accent:#4ade80; --warn:#fbbf24; --txt:#e6edf3; --mut:#8b98a9; --line:#2a3650; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--txt); }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  header h1 { font-size:20px; margin:0; }
+  .status { font-size:13px; color:var(--mut); }
+  .badge { padding:2px 8px; border-radius:10px; font-size:12px; }
+  .online { background:#14532d; color:var(--accent); }
+  .partial { background:#4a3410; color:var(--warn); }
+  .error { color:var(--warn); }
+  .warn-banner { background:#3a2a0a; color:var(--warn); padding:10px 16px; font-size:13px; border-bottom:1px solid var(--line); }
+  main { max-width:1100px; margin:0 auto; padding:24px; display:grid; gap:20px; grid-template-columns:1fr 1fr; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .card.full { grid-column:1 / -1; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:8px 0 4px; }
+  input, select, button { font-size:14px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#0d1320; color:var(--txt); }
+  input, select { width:100%; }
+  button { background:var(--accent); color:#06281a; font-weight:600; cursor:pointer; border:none; margin-top:12px; }
+  button.sec { background:#243049; color:var(--txt); }
+  .row { display:flex; gap:10px; }
+  .row > * { flex:1; }
+  .result { margin-top:14px; font-size:14px; line-height:1.6; }
+  .bars { margin-top:10px; }
+  .bar { height:26px; border-radius:6px; margin:4px 0; display:flex; align-items:center; padding:0 8px; font-size:12px; color:#06281a; font-weight:600; white-space:nowrap; }
+  .b-home{background:#4ade80;} .b-draw{background:#94a3b8;} .b-away{background:#60a5fa;}
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  .muted { color:var(--mut); font-size:12px; }
+  .pill { background:#0d1320; border:1px solid var(--line); border-radius:8px; padding:8px; margin:6px 0; font-size:13px; }
+  .keep { color:var(--accent); } .leave { color:var(--warn); }
+  select.matches { height:120px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ BetAnalyzer</h1>
+  <span class="status" id="status">cargando…</span>
+</header>
+<div class="warn-banner">
+  ⚠️ Herramienta de <b>análisis</b>, no de apuestas garantizadas. Nadie predice resultados
+  de forma fiable. Las combinadas favorecen a la casa. No coloca apuestas reales. Juega con responsabilidad.
+</div>
+<main>
+  <section class="card">
+    <h2>Próximos partidos</h2>
+    <p class="muted">Datos reales de TheSportsDB. Si la API no responde, la app muestra el error y no inventa partidos.</p>
+    <select id="upcoming" class="matches" multiple size="6"></select>
+    <button class="sec" onclick="loadUpcoming()">Recargar</button>
+  </section>
+  <section class="card">
+    <h2>Analizar un partido</h2>
+    <div class="row"><div><label>Local</label><input id="a-home" placeholder="Manchester City" /></div><div><label>Visitante</label><input id="a-away" placeholder="Liverpool" /></div></div>
+    <details style="margin-top:10px"><summary class="muted">Contexto opcional</summary>
+      <div class="row"><div><label>Bajas clave local (0–5)</label><input id="a-ha" type="number" min="0" max="5" value="0" /></div><div><label>Bajas clave visitante (0–5)</label><input id="a-aa" type="number" min="0" max="5" value="0" /></div></div>
+      <div class="row"><div><label>Motivación local</label><select id="a-hm"><option value="-2">Muy baja</option><option value="-1">Baja</option><option value="0" selected>Normal</option><option value="1">Alta</option><option value="2">Debe ganar</option></select></div><div><label>Motivación visitante</label><select id="a-am"><option value="-2">Muy baja</option><option value="-1">Baja</option><option value="0" selected>Normal</option><option value="1">Alta</option><option value="2">Debe ganar</option></select></div></div>
+    </details>
+    <button onclick="analyze()">Analizar probabilidades</button>
+    <div class="result" id="analyze-out"></div>
+  </section>
+  <section class="card">
+    <h2>Generar combinada</h2>
+    <p class="muted">Selecciona 2+ partidos de la lista de próximos (Ctrl/Cmd+clic) y genera una combinada sugerida.</p>
+    <label>Máx. de patas</label><select id="legs"><option>2</option><option selected>3</option><option>4</option></select>
+    <button onclick="parlay()">Sugerir combinada</button><div class="result" id="parlay-out"></div>
+  </section>
+  <section class="card">
+    <h2>¿Me retiro? (cash out en vivo)</h2>
+    <div class="row"><div><label>Local</label><input id="c-home" placeholder="Real Madrid" /></div><div><label>Visitante</label><input id="c-away" placeholder="Barcelona" /></div></div>
+    <div class="row"><div><label>Mercado apostado</label><select id="c-market"><option value="home">Gana local</option><option value="draw">Empate</option><option value="away">Gana visitante</option><option value="over_2_5">Más de 2.5 goles</option><option value="btts">Ambos marcan</option></select></div><div><label>Minuto</label><input id="c-min" type="number" value="60" /></div></div>
+    <div class="row"><div><label>Goles local</label><input id="c-gh" type="number" value="1" /></div><div><label>Goles visit.</label><input id="c-ga" type="number" value="0" /></div></div>
+    <div class="row"><div><label>Apostado</label><input id="c-stake" type="number" min="0" value="10" /></div><div><label>Cuota original</label><input id="c-odds" type="number" min="1.01" step="0.01" value="2.10" /></div><div><label>Cash-out ofrecido</label><input id="c-offer" type="number" min="0" step="0.01" placeholder="opcional" /></div></div>
+    <details style="margin-top:10px"><summary class="muted">Mismas bajas/motivación (opcional)</summary>
+      <div class="row"><div><label>Bajas local</label><input id="c-ha" type="number" min="0" max="5" value="0" /></div><div><label>Bajas visitante</label><input id="c-aa" type="number" min="0" max="5" value="0" /></div></div>
+      <div class="row"><div><label>Motivación local</label><select id="c-hm"><option value="-2">Muy baja</option><option value="-1">Baja</option><option value="0" selected>Normal</option><option value="1">Alta</option><option value="2">Debe ganar</option></select></div><div><label>Motivación visitante</label><select id="c-am"><option value="-2">Muy baja</option><option value="-1">Baja</option><option value="0" selected>Normal</option><option value="1">Alta</option><option value="2">Debe ganar</option></select></div></div>
+    </details>
+    <button onclick="cashout()">¿Mantener o retirarme?</button><div class="result" id="cashout-out"></div>
+  </section>
+  <section class="card full">
+    <h2>Seguimiento y aprendizaje</h2>
+    <p class="muted">Al analizar un partido marca "guardar". Cuando termine, registra el resultado real: el modelo reaprende y mejora su calibración. Métricas: tasa de acierto y Brier score (0 = perfecto).</p>
+    <div id="metrics" class="pill"></div>
+    <div class="row"><div><label>ID predicción</label><input id="r-id" type="number" /></div><div><label>Goles local</label><input id="r-gh" type="number" /></div><div><label>Goles visit.</label><input id="r-ga" type="number" /></div><div style="align-self:end"><button onclick="resolve()">Registrar resultado</button></div></div>
+    <table id="preds"></table>
+  </section>
+</main>
+<script>
+async function api(path, body) { const opt = body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {}; const r = await fetch(path, opt); const data = await r.json().catch(() => ({error:'Respuesta inválida del servidor'})); if (!r.ok) throw new Error(data.error || `Error HTTP ${r.status}`); return data; }
+function pct(x){ return (x*100).toFixed(1)+'%'; }
+function manual(prefix){ return {home_absences: document.getElementById(prefix+'-ha').value, away_absences: document.getElementById(prefix+'-aa').value, home_motivation: document.getElementById(prefix+'-hm').value, away_motivation: document.getElementById(prefix+'-am').value}; }
+function showError(out, error){ out.innerHTML = `<span class="error">${error.message}</span>`; }
+async function loadStatus(){ const s = await api('/api/status'); const state = s.data_error ? `<span class="badge partial">DATOS PARCIALES</span>` : (s.online ? '<span class="badge online">DATOS ONLINE</span>' : '<span class="badge partial">SIN DATOS</span>'); const ready = s.trained ? ` · modelo entrenado con ${s.trained_matches} partidos` : ' · pendiente de datos reales'; document.getElementById('status').innerHTML = state + ready; const m = s.metrics; document.getElementById('metrics').textContent = m.resolved ? `Predicciones resueltas: ${m.resolved} · acierto: ${pct(m.hit_rate)} · Brier: ${m.brier}` : 'Aún no hay predicciones resueltas. Guarda análisis y registra resultados para medir.'; }
+async function loadUpcoming(){ const sel = document.getElementById('upcoming'); try { const d = await api('/api/upcoming'); sel.innerHTML = ''; d.matches.forEach(m => { const o = document.createElement('option'); o.value = JSON.stringify({home:m.home, away:m.away}); o.textContent = `[${m.sport||'fútbol'}] ${m.home} vs ${m.away} — ${m.league||''} (${m.date||'?'})`; sel.appendChild(o); }); } catch (error) { sel.innerHTML = `<option disabled>${error.message}</option>`; } loadStatus(); }
+async function analyze(){ const home = document.getElementById('a-home').value; const away = document.getElementById('a-away').value; const out = document.getElementById('analyze-out'); out.textContent = 'Consultando datos reales y calculando…'; try { const r = await api('/api/analyze', {home, away, save:true, manual:manual('a')}); const reasons = r.signals.breakdown.map(x => `<div class="muted">• ${x}</div>`).join(''); out.innerHTML = `<b>${r.home}</b> vs <b>${r.away}</b> — predicción #${r.prediction_id}<br/>Goles esperados: ${r.expected_home_goals} - ${r.expected_away_goals}<br/><div class="bars"><div class="bar b-home" style="width:${Math.max(6,r.p_home*100)}%">Local ${pct(r.p_home)} (justa ${r.fair_odds.home})</div><div class="bar b-draw" style="width:${Math.max(6,r.p_draw*100)}%">Empate ${pct(r.p_draw)} (${r.fair_odds.draw})</div><div class="bar b-away" style="width:${Math.max(6,r.p_away*100)}%">Visitante ${pct(r.p_away)} (${r.fair_odds.away})</div></div><div class="muted" style="margin-top:8px">Más de 2.5: ${pct(r.p_over_2_5)} · Ambos marcan: ${pct(r.p_btts)}</div><div class="pill"><b>Por qué:</b>${reasons}</div>`; loadPredictions(); loadStatus(); } catch (error) { showError(out, error); } }
+async function parlay(){ const sel = document.getElementById('upcoming'); const matches = Array.from(sel.selectedOptions).map(o => JSON.parse(o.value)); const out = document.getElementById('parlay-out'); if (matches.length < 1){ out.textContent = 'Selecciona partidos de la lista de próximos.'; return; } try { const r = await api('/api/parlay', {matches, max_legs: parseInt(document.getElementById('legs').value)}); let legs = r.legs.map(l => `<div class="pill">${l.match} → <b>${l.label}</b> · prob ${pct(l.probability)} · justa ${l.fair_odds}</div>`).join(''); out.innerHTML = legs + `<div class="pill"><b>Combinada:</b> prob. conjunta ${pct(r.combined_probability)} · cuota justa ${r.combined_fair_odds}</div><div class="muted">⚠️ ${r.warning}</div>`; } catch (error) { showError(out, error); } }
+async function cashout(){ const body = {home:document.getElementById('c-home').value, away:document.getElementById('c-away').value, market:document.getElementById('c-market').value, minute:document.getElementById('c-min').value, home_score:document.getElementById('c-gh').value, away_score:document.getElementById('c-ga').value, stake:document.getElementById('c-stake').value, original_odds:document.getElementById('c-odds').value, offered_cashout:document.getElementById('c-offer').value, manual:manual('c')}; const out = document.getElementById('cashout-out'); out.textContent = 'Consultando datos reales y calculando…'; try { const r = await api('/api/cashout', body); const cls = r.keep ? 'keep' : 'leave'; const verdict = r.keep ? 'MANTENER' : 'RETIRARTE'; const reasons = r.breakdown.map(x => `<div class="muted">• ${x}</div>`).join(''); out.innerHTML = `Marcador ${r.score} · minuto ${r.minute}<br/>Prob. de ganar ahora: <b>${pct(r.win_probability_now)}</b> · valor justo: <b>${r.fair_cashout}</b><br/><div class="pill"><span class="${cls}">👉 ${verdict}</span> — ${r.recommendation}</div><div class="pill"><b>Contexto:</b>${reasons}</div>`; } catch (error) { showError(out, error); } }
+async function loadPredictions(){ const d = await api('/api/predictions'); const t = document.getElementById('preds'); let rows = '<tr><th>ID</th><th>Partido</th><th>Predicho</th><th>Real</th><th>Resultado</th></tr>'; d.predictions.forEach(p => { const real = p.resolved ? `${p.actual_home_goals}-${p.actual_away_goals}` : '—'; const hit = p.resolved ? (p.predicted_outcome===p.actual_outcome ? '✅' : '❌') : '⏳'; rows += `<tr><td>${p.id}</td><td>${p.match_name}</td><td>${p.predicted_outcome}</td><td>${real}</td><td>${hit}</td></tr>`; }); t.innerHTML = rows; }
+async function resolve(){ const body = {prediction_id:document.getElementById('r-id').value, home_goals:document.getElementById('r-gh').value, away_goals:document.getElementById('r-ga').value}; try { await api('/api/resolve', body); loadPredictions(); loadStatus(); } catch (error) { alert(error.message); } }
+loadStatus(); loadUpcoming(); loadPredictions();
+</script>
+</body>
+</html>
